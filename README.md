@@ -278,11 +278,6 @@ curl -X POST http://localhost:5000/api/bookings \
   }'
 ```
 
-## Support
-
-For issues or questions:
-- Email: dev@afroflavours.com
-- Documentation: [API Docs](https://docs.afroflavours.com)
 
 ## License
 
