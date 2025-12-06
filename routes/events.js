@@ -2,6 +2,29 @@
 const express = require('express');
 const router = express.Router();
 const Event = require('../models/Event');
+const multer = require('multer');
+const cloudinary = require('cloudinary').v2;
+
+// Cloudinary config (make sure process.env vars are set)
+cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+// Multer memory storage (we'll upload buffer to Cloudinary manually)
+const storage = multer.memoryStorage();
+const upload = multer({
+    storage,
+    fileFilter: (req, file, cb) => {
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
+        if (allowedTypes.includes(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(new Error('Invalid file type. Only JPG, JPEG, PNG allowed.'));
+        }
+    }
+});
 
 // Get upcoming events
 router.get('/upcoming', async (req, res) => {
@@ -16,22 +39,6 @@ router.get('/upcoming', async (req, res) => {
         res.status(500).json({ success: false, message: 'Failed to fetch events' });
     }
 });
-
-// Get event gallery
-// router.get('/gallery', async (req, res) => {
-//     try {
-//         const gallery = [
-//             { id: 1, title: 'Afrobeat Night', image: '/images/gallery/1.jpg', date: '2025-11-08' },
-//             { id: 2, title: 'Birthday Celebration', image: '/images/gallery/2.jpg', date: '2025-11-05' },
-//             { id: 3, title: 'Corporate Event', image: '/images/gallery/3.jpg', date: '2025-11-01' }
-//         ];
-//
-//         res.json({ success: true, gallery });
-//     } catch (error) {
-//         console.error('Gallery error:', error);
-//         res.status(500).json({ success: false, message: 'Failed to fetch gallery' });
-//     }
-// });
 
 // Get African Experience schedule
 router.get('/african-experience', async (req, res) => {
@@ -50,35 +57,105 @@ router.get('/african-experience', async (req, res) => {
     }
 });
 
+
 // POST /api/events
-router.post('/', async (req, res) => {
+// Accepts optional single image field named 'image'. If provided, uploads to Cloudinary
+router.post('/', upload.single('image'), async (req, res) => {
     try {
-        const event = new Event(req.body);
+        const eventData = { ...req.body };
+
+        if (req.file) {
+            // upload buffer to Cloudinary
+            const result = await new Promise((resolve, reject) => {
+                const stream = cloudinary.uploader.upload_stream(
+                    {
+                        folder: "events",
+                        allowed_formats: ["jpg", "png", "jpeg"],
+                    },
+                    (error, result) => {
+                        if (error) return reject(error);
+                        resolve(result);
+                    }
+                );
+                stream.end(req.file.buffer);
+            });
+
+            eventData.imageUrl = result.secure_url;
+            eventData.imagePublicId = result.public_id; // store full public id (with folder)
+        }
+
+        const event = new Event(eventData);
         await event.save();
         res.json({ success: true, event });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ success: false, message: 'Failed to create event' });
+        console.error('Create event error:', error);
+        res.status(500).json({ success: false, message: 'Failed to create event', error: error.message });
     }
 });
 
 // PUT /api/events/:id
-router.put('/:id', async (req, res) => {
+// Accepts optional single image field named 'image'. If provided, replaces previous image in Cloudinary.
+router.put('/:id', upload.single('image'), async (req, res) => {
     try {
-        const event = await Event.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        const updateData = { ...req.body };
+
+        if (req.file) {
+            // Find existing event to delete old image if present
+            const existing = await Event.findById(req.params.id);
+            if (existing && existing.imagePublicId) {
+                try {
+                    await cloudinary.uploader.destroy(existing.imagePublicId);
+                } catch (err) {
+                    console.warn('Failed to delete previous image from Cloudinary:', err.message);
+                    // continue - not fatal
+                }
+            }
+
+            // upload new file
+            const result = await new Promise((resolve, reject) => {
+                const stream = cloudinary.uploader.upload_stream(
+                    {
+                        folder: "events",
+                        allowed_formats: ["jpg", "png", "jpeg"],
+                    },
+                    (error, result) => {
+                        if (error) return reject(error);
+                        resolve(result);
+                    }
+                );
+                stream.end(req.file.buffer);
+            });
+
+            updateData.imageUrl = result.secure_url;
+            updateData.imagePublicId = result.public_id;
+        }
+
+        const event = await Event.findByIdAndUpdate(req.params.id, updateData, { new: true });
         res.json({ success: true, event });
     } catch (error) {
-        res.status(500).json({ success: false, message: 'Failed to update event' });
+        console.error('Update event error:', error);
+        res.status(500).json({ success: false, message: 'Failed to update event', error: error.message });
     }
 });
 
+// ...existing code...
 // DELETE /api/events/:id
 router.delete('/:id', async (req, res) => {
     try {
+        const event = await Event.findById(req.params.id);
+        if (event && event.imagePublicId) {
+            try {
+                await cloudinary.uploader.destroy(event.imagePublicId);
+            } catch (err) {
+                console.warn('Failed to delete image from Cloudinary during event deletion:', err.message);
+                // continue with deleting event record
+            }
+        }
+
         await Event.findByIdAndDelete(req.params.id);
         res.json({ success: true });
     } catch (error) {
-        res.status(500).json({ success: false, message: 'Failed to delete event' });
+        res.status(500).json({ success: false, message: 'Failed to delete event', error: error.message });
     }
 });
 

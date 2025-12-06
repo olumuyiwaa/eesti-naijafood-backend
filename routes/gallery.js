@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
-const { body, validationResult } = require('express-validator'); // Optional: for validation, like in menu.js
+const { body, validationResult } = require('express-validator');
 
 // Cloudinary config (make sure process.env vars are set)
 cloudinary.config({
