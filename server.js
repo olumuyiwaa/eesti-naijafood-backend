@@ -32,6 +32,7 @@ app.use('/api/catering', require('./routes/catering'));
 app.use('/api/contact', require('./routes/contact'));
 app.use('/api/events', require('./routes/events'));
 app.use('/api/menu', require('./routes/menu'));
+app.use('/api/gallery', require('./routes/gallery'));
 app.use('/api/newsletter', require('./routes/newsletter'));
 app.use('/api/reviews', require('./routes/reviews'));
 app.use('/api/payments', require('./routes/payments'));
