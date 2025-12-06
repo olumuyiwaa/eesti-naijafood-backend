@@ -27,7 +27,9 @@ const eventSchema = new mongoose.Schema({
         type: String,
         enum: ['Afrobeat', 'Amapiano', 'Highlife', 'Drumming', 'Mixed']
     },
-    image: String,
+
+    imageUrl: String,
+    imagePublicId: String,
     capacity: Number,
     bookingsCount: {
         type: Number,
