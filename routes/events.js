@@ -18,20 +18,20 @@ router.get('/upcoming', async (req, res) => {
 });
 
 // Get event gallery
-router.get('/gallery', async (req, res) => {
-    try {
-        const gallery = [
-            { id: 1, title: 'Afrobeat Night', image: '/images/gallery/1.jpg', date: '2025-11-08' },
-            { id: 2, title: 'Birthday Celebration', image: '/images/gallery/2.jpg', date: '2025-11-05' },
-            { id: 3, title: 'Corporate Event', image: '/images/gallery/3.jpg', date: '2025-11-01' }
-        ];
-
-        res.json({ success: true, gallery });
-    } catch (error) {
-        console.error('Gallery error:', error);
-        res.status(500).json({ success: false, message: 'Failed to fetch gallery' });
-    }
-});
+// router.get('/gallery', async (req, res) => {
+//     try {
+//         const gallery = [
+//             { id: 1, title: 'Afrobeat Night', image: '/images/gallery/1.jpg', date: '2025-11-08' },
+//             { id: 2, title: 'Birthday Celebration', image: '/images/gallery/2.jpg', date: '2025-11-05' },
+//             { id: 3, title: 'Corporate Event', image: '/images/gallery/3.jpg', date: '2025-11-01' }
+//         ];
+//
+//         res.json({ success: true, gallery });
+//     } catch (error) {
+//         console.error('Gallery error:', error);
+//         res.status(500).json({ success: false, message: 'Failed to fetch gallery' });
+//     }
+// });
 
 // Get African Experience schedule
 router.get('/african-experience', async (req, res) => {

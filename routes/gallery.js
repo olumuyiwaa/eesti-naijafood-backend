@@ -97,8 +97,12 @@ router.get('/', async (req, res) => {
 router.delete('/:publicId', async (req, res) => {
     const { publicId } = req.params;
     try {
-        await cloudinary.uploader.destroy(publicId);
-        res.status(200).json({ success: true, message: "Image deleted successfully" });
+        const deletionResult = await cloudinary.uploader.destroy(publicId);
+        if (deletionResult.result === 'ok') {
+            res.status(200).json({ success: true, message: "Image deleted successfully" });
+        } else {
+            res.status(404).json({ success: false, message: "Image not found or already deleted" });
+        }
     } catch (error) {
         console.error('Deletion error:', error);
         res.status(500).json({ success: false, message: "Deletion failed", error: error.message });
