@@ -14,7 +14,6 @@ cloudinary.config({
     api_key: process.env.CLOUDINARY_API_KEY,
     api_secret: process.env.CLOUDINARY_API_SECRET,
 });
-
 // multer memory storage (we'll upload buffer to Cloudinary)
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
