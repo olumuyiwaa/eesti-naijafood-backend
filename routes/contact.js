@@ -75,8 +75,12 @@ router.post("/", contactValidation, async (req, res) => {
             `
         };
 
-        await transporter.sendMail(adminMailOptions);
-        await transporter.sendMail(userMailOptions);
+        try {
+            await transporter.sendMail(adminMailOptions);
+            await transporter.sendMail(userMailOptions);
+        } catch (emailError) {
+            console.error('Email error:', emailError);
+        }
 
         res.status(200).json({
             success: true,
