@@ -9,7 +9,7 @@ const Booking = require('../models/Booking'); // Assuming you have a Booking mod
 // Create transporter - handle both CommonJS and ES modules
 let transporter;
 try {
-    transporter = nodemailer.createTransporter({
+    transporter = nodemailer.createTransport({
         host: process.env.SMTP_HOST,
         port: process.env.SMTP_PORT,
         secure: true,
@@ -194,36 +194,23 @@ async function handleSuccessfulPayment(paymentIntent) {
         <p><strong>Quote Reference:</strong> ${quoteRef}</p>
         <p><strong>Deposit Paid:</strong> $${(paymentIntent.amount / 100).toFixed(2)} NZD</p>
         <p>Your catering booking is now secured. We'll be in touch with final details soon.</p>
-        <p>Best regards NgRx, but assuming you have a Booking model (e.g., Mongoose schema).
-
-        await transporter.sendMail({
-            from: process.env.SMTP_FROM,
-            to: customerEmail,
-            subject: 'Catering Deposit Confirmed - Afroflavours',
-            html: `
-                <h2>Deposit Received!</h2>
-        <p>Dear ${customerName},</p>
-        <p>Your catering deposit has been successfully processed.</p>
-        <p><strong>Quote Reference:</strong> ${quoteRef}</p>
-        <p><strong>Deposit Paid:</strong> $${(paymentIntent.amount / 100).toFixed(2)} NZD</p>
-        <p>Your catering booking is now secured. We'll be in touch with final details soon.</p>
         <p>Best regards,<br>The Afroflavours Team</p>
-    `
-    });
+      `
+        });
     }
 
     console.log('Payment successful:', paymentIntent.id);
-    }
+}
 
-    // Handle failed payment
-    async function handleFailedPayment(paymentIntent) {
-        const { customerEmail, customerName, bookingRef, quoteRef } = paymentIntent.metadata;
+// Handle failed payment
+async function handleFailedPayment(paymentIntent) {
+    const { customerEmail, customerName, bookingRef, quoteRef } = paymentIntent.metadata;
 
-        await transporter.sendMail({
-            from: process.env.SMTP_FROM,
-            to: customerEmail,
-            subject: 'Payment Failed - Afroflavours',
-            html: `
+    await transporter.sendMail({
+        from: process.env.SMTP_FROM,
+        to: customerEmail,
+        subject: 'Payment Failed - Afroflavours',
+        html: `
       <h2>Payment Failed</h2>
       <p>Dear ${customerName},</p>
       <p>Unfortunately, your payment could not be processed.</p>
@@ -232,148 +219,148 @@ async function handleSuccessfulPayment(paymentIntent) {
       <p>Please try again or contact us for assistance.</p>
       <p>Best regards,<br>The Afroflavours Team</p>
     `
+    });
+
+    console.error('Payment failed:', paymentIntent.id);
+}
+
+// Handle refund
+async function handleRefund(charge) {
+    console.log('Refund processed:', charge.id);
+    // Update database and send notification
+}
+
+// Get payment details
+router.get('/payment/:paymentIntentId', async (req, res) => {
+    try {
+        const { paymentIntentId } = req.params;
+
+        const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+
+        res.json({
+            success: true,
+            payment: {
+                id: paymentIntent.id,
+                amount: paymentIntent.amount / 100,
+                status: paymentIntent.status,
+                created: new Date(paymentIntent.created * 1000),
+                metadata: paymentIntent.metadata
+            }
         });
 
-        console.error('Payment failed:', paymentIntent.id);
+    } catch (error) {
+        console.error('Payment retrieval error:', error);
+        res.status(500).json({ success: false, message: 'Failed to retrieve payment' });
     }
+});
 
-    // Handle refund
-    async function handleRefund(charge) {
-        console.log('Refund processed:', charge.id);
-        // Update database and send notification
+// Create refund
+router.post('/refund', async (req, res) => {
+    try {
+        const { paymentIntentId, amount, reason } = req.body;
+
+        const refund = await stripe.refunds.create({
+            payment_intent: paymentIntentId,
+            amount: amount ? Math.round(amount * 100) : undefined, // Partial or full refund
+            reason: reason || 'requested_by_customer'
+        });
+
+        res.json({
+            success: true,
+            refund: {
+                id: refund.id,
+                amount: refund.amount / 100,
+                status: refund.status
+            }
+        });
+
+    } catch (error) {
+        console.error('Refund error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to process refund',
+            error: error.message
+        });
     }
+});
 
-    // Get payment details
-    router.get('/payment/:paymentIntentId', async (req, res) => {
-        try {
-            const { paymentIntentId } = req.params;
+// Get all payments (admin)
+router.get('/admin/payments', async (req, res) => {
+    try {
+        const { limit = 10, starting_after } = req.query;
 
-            const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+        const payments = await stripe.paymentIntents.list({
+            limit: parseInt(limit),
+            starting_after: starting_after
+        });
 
-            res.json({
-                success: true,
-                payment: {
-                    id: paymentIntent.id,
-                    amount: paymentIntent.amount / 100,
-                    status: paymentIntent.status,
-                    created: new Date(paymentIntent.created * 1000),
-                    metadata: paymentIntent.metadata
+        const formattedPayments = payments.data.map(payment => ({
+            id: payment.id,
+            amount: payment.amount / 100,
+            status: payment.status,
+            currency: payment.currency,
+            customer: payment.metadata.customerName,
+            email: payment.metadata.customerEmail,
+            reference: payment.metadata.bookingRef || payment.metadata.quoteRef,
+            type: payment.metadata.type,
+            created: new Date(payment.created * 1000)
+        }));
+
+        res.json({
+            success: true,
+            payments: formattedPayments,
+            hasMore: payments.has_more
+        });
+
+    } catch (error) {
+        console.error('Admin payments error:', error);
+        res.status(500).json({ success: false, message: 'Failed to fetch payments' });
+    }
+});
+
+// Get payment statistics (admin)
+router.get('/admin/payment-stats', async (req, res) => {
+    try {
+        const thirtyDaysAgo = Math.floor(Date.now() / 1000) - (30 * 24 * 60 * 60);
+
+        const payments = await stripe.paymentIntents.list({
+            limit: 100,
+            created: { gte: thirtyDaysAgo }
+        });
+
+        const stats = {
+            totalRevenue: 0,
+            successfulPayments: 0,
+            failedPayments: 0,
+            pendingPayments: 0,
+            refundedAmount: 0,
+            bookingDeposits: 0,
+            cateringDeposits: 0
+        };
+
+        payments.data.forEach(payment => {
+            if (payment.status === 'succeeded') {
+                stats.totalRevenue += payment.amount / 100;
+                stats.successfulPayments++;
+
+                if (payment.metadata.type === 'booking_deposit') {
+                    stats.bookingDeposits += payment.amount / 100;
+                } else if (payment.metadata.type === 'catering_deposit') {
+                    stats.cateringDeposits += payment.amount / 100;
                 }
-            });
+            } else if (payment.status === 'failed') {
+                stats.failedPayments++;
+            } else {
+                stats.pendingPayments++;
+            }
+        });
 
-        } catch (error) {
-            console.error('Payment retrieval error:', error);
-            res.status(500).json({ success: false, message: 'Failed to retrieve payment' });
-        }
-    });
+        res.json({ success: true, stats });
 
-    // Create refund
-    router.post('/refund', async (req, res) => {
-        try {
-            const { paymentIntentId, amount, reason } = req.body;
+    } catch (error) {
+        console.error('Payment stats error:', error);
+        res.status(500).json({ success: false, message: 'Failed to fetch stats' });
+    }
+});
 
-            const refund = await stripe.refunds.create({
-                payment_intent: paymentIntentId,
-                amount: amount ? Math.round(amount * 100) : undefined, // Partial or full refund
-                reason: reason || 'requested_by_customer'
-            });
-
-            res.json({
-                success: true,
-                refund: {
-                    id: refund.id,
-                    amount: refund.amount / 100,
-                    status: refund.status
-                }
-            });
-
-        } catch (error) {
-            console.error('Refund error:', error);
-            res.status(500).json({
-                success: false,
-                message: 'Failed to process refund',
-                error: error.message
-            });
-        }
-    });
-
-    // Get all payments (admin)
-    router.get('/admin/payments', async (req, res) => {
-        try {
-            const { limit = 10, starting_after } = req.query;
-
-            const payments = await stripe.paymentIntents.list({
-                limit: parseInt(limit),
-                starting_after: starting_after
-            });
-
-            const formattedPayments = payments.data.map(payment => ({
-                id: payment.id,
-                amount: payment.amount / 100,
-                status: payment.status,
-                currency: payment.currency,
-                customer: payment.metadata.customerName,
-                email: payment.metadata.customerEmail,
-                reference: payment.metadata.bookingRef || payment.metadata.quoteRef,
-                type: payment.metadata.type,
-                created: new Date(payment.created * 1000)
-            }));
-
-            res.json({
-                success: true,
-                payments: formattedPayments,
-                hasMore: payments.has_more
-            });
-
-        } catch (error) {
-            console.error('Admin payments error:', error);
-            res.status(500).json({ success: false, message: 'Failed to fetch payments' });
-        }
-    });
-
-    // Get payment statistics (admin)
-    router.get('/admin/payment-stats', async (req, res) => {
-        try {
-            const thirtyDaysAgo = Math.floor(Date.now() / 1000) - (30 * 24 * 60 * 60);
-
-            const payments = await stripe.paymentIntents.list({
-                limit: 100,
-                created: { gte: thirtyDaysAgo }
-            });
-
-            const stats = {
-                totalRevenue: 0,
-                successfulPayments: 0,
-                failedPayments: 0,
-                pendingPayments: 0,
-                refundedAmount: 0,
-                bookingDeposits: 0,
-                cateringDeposits: 0
-            };
-
-            payments.data.forEach(payment => {
-                if (payment.status === 'succeeded') {
-                    stats.totalRevenue += payment.amount / 100;
-                    stats.successfulPayments++;
-
-                    if (payment.metadata.type === 'booking_deposit') {
-                        stats.bookingDeposits += payment.amount / 100;
-                    } else if (payment.metadata.type === 'catering_deposit') {
-                        stats.cateringDeposits += payment.amount / 100;
-                    }
-                } else if (payment.status === 'failed') {
-                    stats.failedPayments++;
-                } else {
-                    stats.pendingPayments++;
-                }
-            });
-
-            res.json({ success: true, stats });
-
-        } catch (error) {
-            console.error('Payment stats error:', error);
-            res.status(500).json({ success: false, message: 'Failed to fetch stats' });
-        }
-    });
-
-    module.exports = router;
+module.exports = router;
