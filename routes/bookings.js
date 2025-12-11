@@ -108,14 +108,14 @@ router.get('/', async (req, res) => {
 // ------------------------------------
 router.post('/update-status', async (req, res) => {
     try {
-        const { bookingRef, status } = req.body; // ✅ Changed to bookingRef
+        const { bookingRef, status } = req.body;
 
         if (!bookingRef || !status) {
             return res.status(400).json({ success: false, message: "Missing bookingRef or status" });
         }
 
         const booking = await Booking.findOneAndUpdate(
-            { bookingRef: bookingRef }, // ✅ Using bookingRef (or just { bookingRef })
+            { bookingRef: bookingRef },
             { status },
             { new: true }
         );
