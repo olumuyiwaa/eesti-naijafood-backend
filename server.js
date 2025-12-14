@@ -6,6 +6,7 @@ const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
+
 const app = express();
 
 // Middleware
@@ -27,6 +28,7 @@ const limiter = rateLimit({
 app.use('/api/', limiter);
 
 // Routes
+app.use("/api/admin", require("./routes/adminAuth"));
 app.use('/api/bookings', require('./routes/bookings'));
 app.use('/api/catering', require('./routes/catering'));
 app.use('/api/contact', require('./routes/contact'));
@@ -37,7 +39,7 @@ app.use('/api/newsletter', require('./routes/newsletter'));
 app.use('/api/reviews', require('./routes/reviews'));
 app.use('/api/payments', require('./routes/payments'));
 app.use('/api/messages', require('./routes/messages'));
-app.use("/api/admin/dashboard", require("./routes/adminDashboard"));
+app.use("/api/admin/dashboard",require("./middleware/adminAuth"), require("./routes/adminDashboard"));
 
 
 // Health check
