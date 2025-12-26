@@ -1,11 +1,11 @@
 // routes/bookings.js
 const express = require('express');
+const router = express.Router();
 const { body, validationResult } = require('express-validator');
 const { Resend } = require('resend');
 const Booking = require('../models/Booking');
 
 const resend = new Resend(process.env.RESEND_API_KEY);
-
 
 // Validation middleware
 const bookingValidation = [
@@ -33,7 +33,15 @@ router.post('/', bookingValidation, async (req, res) => {
         const bookingRef = `AFR${Date.now().toString().slice(-8)}`;
 
         const booking = await Booking.create({
-            bookingRef, name, email, phone, date, time, guests, bookingType, specialRequests
+            bookingRef,
+            name,
+            email,
+            phone,
+            date,
+            time,
+            guests,
+            bookingType,
+            specialRequests
         });
 
         // Send emails via Resend
@@ -46,6 +54,11 @@ router.post('/', bookingValidation, async (req, res) => {
                   <h2>Booking Confirmation</h2>
                   <p>Thank you for your booking!</p>
                   <p><strong>Reference:</strong> ${bookingRef}</p>
+                  <p><strong>Date:</strong> ${new Date(date).toLocaleDateString()}</p>
+                  <p><strong>Time:</strong> ${time}</p>
+                  <p><strong>Guests:</strong> ${guests}</p>
+                  <br/>
+                  <p>Best regards,<br>Afroflavours Team</p>
                 `
             });
 
@@ -53,112 +66,70 @@ router.post('/', bookingValidation, async (req, res) => {
                 from: process.env.SMTP_FROM || 'onboarding@resend.dev',
                 to: process.env.ADMIN_EMAIL,
                 subject: `New Booking - ${bookingRef}`,
-                html: `<h2>New booking received</h2><p>Reference: ${bookingRef}</p>`
+                html: `
+                    <h2>New booking received</h2>
+                    <p><strong>Reference:</strong> ${bookingRef}</p>
+                    <p><strong>Name:</strong> ${name}</p>
+                    <p><strong>Email:</strong> ${email}</p>
+                `
             });
         } catch (emailErr) {
             console.warn("Email could not be sent via Resend:", emailErr.message);
         }
 
-        res.status(201).json({ success: true, message: 'Booking created successfully', booking });
+        res.status(201).json({
+            success: true,
+            message: 'Booking created successfully',
+            booking
+        });
+
     } catch (error) {
         console.error('Booking error:', error);
         res.status(500).json({ success: false, message: 'Failed to create booking' });
     }
 });
 
-// ------------------------------------
-// ✅ GET ALL BOOKINGS (used by Admin Dashboard)
-// ------------------------------------
+// GET ALL BOOKINGS
 router.get('/', async (req, res) => {
     try {
         const bookings = await Booking.find().sort({ createdAt: -1 });
         res.json({ success: true, bookings });
     } catch (error) {
-        console.error("Fetch error:", error);
         res.status(500).json({ success: false, message: "Failed to fetch bookings" });
     }
 });
 
-// ------------------------------------
-// ❗ REQUIRED BY YOUR FRONTEND
-// POST /api/bookings/update-status
-// ------------------------------------
+// UPDATE STATUS
 router.post('/update-status', async (req, res) => {
     try {
         const { bookingRef, status } = req.body;
-
-        if (!bookingRef || !status) {
-            return res.status(400).json({ success: false, message: "Missing bookingRef or status" });
-        }
-
-        const booking = await Booking.findOneAndUpdate(
-            { bookingRef: bookingRef },
-            { status },
-            { new: true }
-        );
-
-        if (!booking) {
-            return res.status(404).json({ success: false, message: "Booking not found" });
-        }
-
-        res.json({
-            success: true,
-            message: "Booking updated",
-            booking
-        });
-
+        const booking = await Booking.findOneAndUpdate({ bookingRef }, { status }, { new: true });
+        if (!booking) return res.status(404).json({ success: false, message: "Booking not found" });
+        res.json({ success: true, booking });
     } catch (error) {
-        console.error("Update status error:", error);
         res.status(500).json({ success: false, message: "Failed to update status" });
     }
 });
 
-// ------------------------------------
-// GET AVAILABLE SLOTS
-// ------------------------------------
+// GET AVAILABILITY
 router.get('/availability', async (req, res) => {
     try {
         const { date } = req.query;
-
-        if (!date) {
-            return res.status(400).json({ success: false, message: 'Date is required' });
-        }
-
-        const allSlots = [
-            '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', '14:00', '14:30',
-            '17:00', '17:30', '18:00', '18:30', '19:00', '19:30', '20:00', '20:30', '21:00'
-        ];
-
-        // TODO: subtract already booked slots
-        res.json({
-            success: true,
-            date,
-            availableSlots: allSlots
-        });
-
+        const allSlots = ['11:00', '11:30', '12:00', '12:30', '13:00', '13:30', '14:00', '14:30', '17:00', '17:30', '18:00', '18:30', '19:00', '19:30', '20:00', '20:30', '21:00'];
+        res.json({ success: true, date, availableSlots: allSlots });
     } catch (error) {
-        console.error('Availability error:', error);
         res.status(500).json({ success: false, message: 'Failed to fetch availability' });
     }
 });
 
-// ------------------------------------
 // CANCEL BOOKING
-// ------------------------------------
 router.delete('/:bookingRef', async (req, res) => {
     try {
         const { bookingRef } = req.params;
-
         const booking = await Booking.findOneAndDelete({ bookingRef });
-
-        if (!booking) {
-            return res.status(404).json({ success: false, message: 'Booking not found' });
-        }
-
+        if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
         res.json({ success: true, message: 'Booking cancelled successfully' });
-
     } catch (error) {
-        console.error('Cancellation error:', error);
         res.status(500).json({ success: false, message: 'Failed to cancel booking' });
     }
 });
