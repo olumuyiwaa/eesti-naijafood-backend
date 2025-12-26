@@ -5,29 +5,10 @@ const { body, validationResult } = require('express-validator');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const nodemailer = require('nodemailer').default || require('nodemailer');
 const Booking = require('../models/Booking'); // Assuming you have a Booking model
+const { Resend } = require('resend');
+const resend = new Resend(process.env.RESEND_API_KEY);
 
-// Create transporter - handle both CommonJS and ES modules
-let transporter;
-try {
-    transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: process.env.SMTP_PORT,
-        secure: true,
-        auth: {
-            user: process.env.SMTP_USER,
-            pass: process.env.SMTP_PASS
-        }
-    });
-} catch (error) {
-    console.error('Nodemailer setup error:', error);
-    // Create a fallback transporter that logs instead of sending
-    transporter = {
-        sendMail: async (options) => {
-            console.log('Email would be sent:', options);
-            return { messageId: 'test-' + Date.now() };
-        }
-    };
-}
+
 
 // Create payment intent for booking deposit
 router.post('/create-booking-payment', async (req, res) => {
@@ -143,85 +124,35 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
 async function handleSuccessfulPayment(paymentIntent) {
     const { bookingRef, quoteRef, type, customerEmail, customerName } = paymentIntent.metadata;
 
-    // Update database based on payment type
     if (type === 'booking_deposit') {
-        // Update booking status to 'confirmed' and add payment info
-        await Booking.findOneAndUpdate(
-            { _id: bookingRef }, // Assuming bookingRef is the _id
-            {
-                status: 'confirmed',
-                paymentStatus: 'paid',
-                paymentIntentId: paymentIntent.id,
-                amountPaid: paymentIntent.amount / 100
-            }
-        );
+        await Booking.findOneAndUpdate({ _id: bookingRef }, { status: 'confirmed' });
 
-        // Send confirmation email
-        await transporter.sendMail({
-            from: process.env.SMTP_FROM,
+        await resend.emails.send({
+            from: process.env.SMTP_FROM || 'onboarding@resend.dev',
             to: customerEmail,
             subject: 'Payment Confirmed - Afroflavours Booking',
-            html: `
-        <h2>Payment Confirmed!</h2>
-        <p>Dear ${customerName},</p>
-        <p>Your payment has been successfully processed.</p>
-        <p><strong>Booking Reference:</strong> ${bookingRef}</p>
-        <p><strong>Amount Paid:</strong> $${(paymentIntent.amount / 100).toFixed(2)} NZD</p>
-        <p>Your booking is now confirmed. We look forward to serving you!</p>
-        <p>Best regards,<br>The Afroflavours Team</p>
-      `
+            html: `<h2>Payment Confirmed!</h2><p>Dear ${customerName}, your booking is confirmed.</p>`
         });
     } else if (type === 'catering_deposit') {
-        // Update catering request
-        // await CateringRequest.findOneAndUpdate(
-        //   { quoteRef },
-        //   {
-        //     status: 'accepted',
-        //     paymentStatus: 'deposit_paid',
-        //     paymentIntentId: paymentIntent.id,
-        //     depositPaid: paymentIntent.amount / 100
-        //   }
-        // );
-
-        await transporter.sendMail({
-            from: process.env.SMTP_FROM,
+        await resend.emails.send({
+            from: process.env.SMTP_FROM || 'onboarding@resend.dev',
             to: customerEmail,
             subject: 'Catering Deposit Confirmed - Afroflavours',
-            html: `
-        <h2>Deposit Received!</h2>
-        <p>Dear ${customerName},</p>
-        <p>Your catering deposit has been successfully processed.</p>
-        <p><strong>Quote Reference:</strong> ${quoteRef}</p>
-        <p><strong>Deposit Paid:</strong> $${(paymentIntent.amount / 100).toFixed(2)} NZD</p>
-        <p>Your catering booking is now secured. We'll be in touch with final details soon.</p>
-        <p>Best regards,<br>The Afroflavours Team</p>
-      `
+            html: `<h2>Deposit Received!</h2><p>Dear ${customerName}, your catering deposit is processed.</p>`
         });
     }
-
-    console.log('Payment successful:', paymentIntent.id);
 }
 
 // Handle failed payment
 async function handleFailedPayment(paymentIntent) {
     const { customerEmail, customerName, bookingRef, quoteRef } = paymentIntent.metadata;
 
-    await transporter.sendMail({
-        from: process.env.SMTP_FROM,
+    await resend.emails.send({
+        from: process.env.SMTP_FROM || 'onboarding@resend.dev',
         to: customerEmail,
         subject: 'Payment Failed - Afroflavours',
-        html: `
-      <h2>Payment Failed</h2>
-      <p>Dear ${customerName},</p>
-      <p>Unfortunately, your payment could not be processed.</p>
-      <p><strong>Reference:</strong> ${bookingRef || quoteRef}</p>
-      <p><strong>Reason:</strong> ${paymentIntent.last_payment_error?.message || 'Unknown error'}</p>
-      <p>Please try again or contact us for assistance.</p>
-      <p>Best regards,<br>The Afroflavours Team</p>
-    `
+        html: `<h2>Payment Failed</h2><p>Dear ${customerName}, unfortunately payment failed.</p>`
     });
-
-    console.error('Payment failed:', paymentIntent.id);
 }
 
 // Handle refund

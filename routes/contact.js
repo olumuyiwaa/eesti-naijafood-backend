@@ -2,19 +2,10 @@
 const express = require('express');
 const router = express.Router();
 const { body, validationResult } = require('express-validator');
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 const Message = require("../models/Message");
 
-
-const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: process.env.SMTP_PORT,
-    secure: true,
-    auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS
-    }
-});
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 // Contact form validation
 const contactValidation = [
@@ -44,42 +35,40 @@ router.post("/", contactValidation, async (req, res) => {
             message
         });
 
-        // 2️⃣ Send email to admin
-        const adminMailOptions = {
-            from: process.env.SMTP_FROM,
-            to: process.env.ADMIN_EMAIL,
-            subject: `Contact Form: ${subject}`,
-            html: `
-                <h2>New Contact Form Submission</h2>
-                <p><strong>Name:</strong> ${name}</p>
-                <p><strong>Email:</strong> ${email}</p>
-                ${phone ? `<p><strong>Phone:</strong> ${phone}</p>` : ''}
-                <p><strong>Subject:</strong> ${subject}</p>
-                <p><strong>Message:</strong></p>
-                <p>${message.replace(/\n/g, "<br>")}</p>
-            `
-        };
-
-        // 3️⃣ Send confirmation to user
-        const userMailOptions = {
-            from: process.env.SMTP_FROM,
-            to: email,
-            subject: "We received your message - Afroflavours",
-            html: `
-                <h2>Thank you for contacting us!</h2>
-                <p>Dear ${name},</p>
-                <p>We've received your message and will reply soon.</p>
-                <p><strong>Your message:</strong></p>
-                <p>${message.replace(/\n/g, "<br>")}</p>
-                <p>Best regards,<br>Afroflavours Team</p>
-            `
-        };
-
+        // 2️⃣ Send emails via Resend
         try {
-            await transporter.sendMail(adminMailOptions);
-            await transporter.sendMail(userMailOptions);
+            // Send to admin
+            await resend.emails.send({
+                from: process.env.SMTP_FROM || 'onboarding@resend.dev',
+                to: process.env.ADMIN_EMAIL,
+                subject: `Contact Form: ${subject}`,
+                html: `
+                    <h2>New Contact Form Submission</h2>
+                    <p><strong>Name:</strong> ${name}</p>
+                    <p><strong>Email:</strong> ${email}</p>
+                    ${phone ? `<p><strong>Phone:</strong> ${phone}</p>` : ''}
+                    <p><strong>Subject:</strong> ${subject}</p>
+                    <p><strong>Message:</strong></p>
+                    <p>${message.replace(/\n/g, "<br>")}</p>
+                `
+            });
+
+            // Send confirmation to user
+            await resend.emails.send({
+                from: process.env.SMTP_FROM || 'onboarding@resend.dev',
+                to: email,
+                subject: "We received your message - Afroflavours",
+                html: `
+                    <h2>Thank you for contacting us!</h2>
+                    <p>Dear ${name},</p>
+                    <p>We've received your message and will reply soon.</p>
+                    <p><strong>Your message:</strong></p>
+                    <p>${message.replace(/\n/g, "<br>")}</p>
+                    <p>Best regards,<br>Afroflavours Team</p>
+                `
+            });
         } catch (emailError) {
-            console.error('Email error:', emailError);
+            console.error('Resend email error:', emailError);
         }
 
         res.status(200).json({
@@ -93,6 +82,7 @@ router.post("/", contactValidation, async (req, res) => {
         res.status(500).json({ success: false, message: "Failed to send message" });
     }
 });
+
 
 // Get contact information
 router.get('/info', async (req, res) => {

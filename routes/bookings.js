@@ -1,20 +1,11 @@
 // routes/bookings.js
 const express = require('express');
-const router = express.Router();
 const { body, validationResult } = require('express-validator');
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 const Booking = require('../models/Booking');
 
-// Email transporter setup
-const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: process.env.SMTP_PORT,
-    secure: true,
-    auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS
-    }
-});
+const resend = new Resend(process.env.RESEND_API_KEY);
+
 
 // Validation middleware
 const bookingValidation = [
@@ -39,25 +30,16 @@ router.post('/', bookingValidation, async (req, res) => {
         }
 
         const { name, email, phone, date, time, guests, bookingType, specialRequests } = req.body;
-
         const bookingRef = `AFR${Date.now().toString().slice(-8)}`;
 
         const booking = await Booking.create({
-            bookingRef,
-            name,
-            email,
-            phone,
-            date,
-            time,
-            guests,
-            bookingType,
-            specialRequests
+            bookingRef, name, email, phone, date, time, guests, bookingType, specialRequests
         });
 
-        // Send emails (optional)
+        // Send emails via Resend
         try {
-            await transporter.sendMail({
-                from: process.env.SMTP_FROM,
+            await resend.emails.send({
+                from: process.env.SMTP_FROM || 'onboarding@resend.dev',
                 to: email,
                 subject: 'Booking Confirmation - Afroflavours',
                 html: `
@@ -67,22 +49,17 @@ router.post('/', bookingValidation, async (req, res) => {
                 `
             });
 
-            await transporter.sendMail({
-                from: process.env.SMTP_FROM,
+            await resend.emails.send({
+                from: process.env.SMTP_FROM || 'onboarding@resend.dev',
                 to: process.env.ADMIN_EMAIL,
                 subject: `New Booking - ${bookingRef}`,
-                html: `<h2>New booking received</h2>`
+                html: `<h2>New booking received</h2><p>Reference: ${bookingRef}</p>`
             });
         } catch (emailErr) {
-            console.warn("Email could not be sent:", emailErr.message);
+            console.warn("Email could not be sent via Resend:", emailErr.message);
         }
 
-        res.status(201).json({
-            success: true,
-            message: 'Booking created successfully',
-            booking
-        });
-
+        res.status(201).json({ success: true, message: 'Booking created successfully', booking });
     } catch (error) {
         console.error('Booking error:', error);
         res.status(500).json({ success: false, message: 'Failed to create booking' });

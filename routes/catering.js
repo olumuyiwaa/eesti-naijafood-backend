@@ -2,10 +2,12 @@
 const express = require('express');
 const router = express.Router();
 const { body, validationResult } = require('express-validator');
-const nodemailer = require('nodemailer');
 const multer = require('multer');
 const path = require('path');
+const { Resend } = require('resend');
 const CateringRequest = require('../models/CateringRequest');
+
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -29,16 +31,6 @@ const upload = multer({
             return cb(null, true);
         }
         cb(new Error('Invalid file type. Only JPEG, PNG, PDF, and DOC files are allowed.'));
-    }
-});
-
-const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: process.env.SMTP_PORT,
-    secure: true,
-    auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS
     }
 });
 
@@ -108,53 +100,23 @@ router.post('/quote', upload.single('attachment'), cateringValidation, async (re
             status: 'pending'
         });
 
-        // Send confirmation to customer
-        const customerMailOptions = {
-            from: process.env.SMTP_FROM,
-            to: email,
-            subject: 'Catering Quote Request Received - Afroflavours',
-            html: `
-                <h2>Catering Quote Request</h2>
-                <p>Dear ${name},</p>
-                <p>Thank you for your interest in Afroflavours catering services!</p>
-                <p><strong>Quote Reference:</strong> ${quoteRef}</p>
-                <p><strong>Event Date:</strong> ${new Date(eventDate).toLocaleDateString()}</p>
-                <p><strong>Event Type:</strong> ${eventType}</p>
-                <p><strong>Guest Count:</strong> ${guestCount}</p>
-                <p>Our team will review your request and get back to you within 24-48 hours with a detailed quote.</p>
-                <p>Best regards,<br>The Afroflavours Team</p>
-            `
-        };
-
         // Send notification to admin
-        const adminMailOptions = {
-            from: process.env.SMTP_FROM,
-            to: process.env.ADMIN_EMAIL,
-            subject: `New Catering Quote Request - ${quoteRef}`,
-            html: `
-                <h2>New Catering Quote Request</h2>
-                <p><strong>Quote Reference:</strong> ${quoteRef}</p>
-                <p><strong>Name:</strong> ${name}</p>
-                <p><strong>Email:</strong> ${email}</p>
-                <p><strong>Phone:</strong> ${phone}</p>
-                <p><strong>Event Date:</strong> ${new Date(eventDate).toLocaleDateString()}</p>
-                <p><strong>Event Type:</strong> ${eventType}</p>
-                <p><strong>Guest Count:</strong> ${guestCount}</p>
-                <p><strong>Venue:</strong> ${venue}</p>
-                ${menuPreferences ? `<p><strong>Menu Preferences:</strong> ${menuPreferences}</p>` : ''}
-                ${specialRequirements ? `<p><strong>Special Requirements:</strong> ${specialRequirements}</p>` : ''}
-                ${budget ? `<p><strong>Budget:</strong> ${budget}</p>` : ''}
-                ${attachment ? `<p><strong>Attachment:</strong> ${attachment}</p>` : ''}
-            `
-        };
-
-        // Send emails (wrapped in try-catch to not fail request if email fails)
         try {
-            await transporter.sendMail(customerMailOptions);
-            await transporter.sendMail(adminMailOptions);
+            await resend.emails.send({
+                from: process.env.SMTP_FROM || 'onboarding@resend.dev',
+                to: email,
+                subject: 'Catering Quote Request Received - Afroflavours',
+                html: `<h2>Catering Quote Request</h2><p>Dear ${name}, thank you...</p>`
+            });
+
+            await resend.emails.send({
+                from: process.env.SMTP_FROM || 'onboarding@resend.dev',
+                to: process.env.ADMIN_EMAIL,
+                subject: `New Catering Quote Request - ${quoteRef}`,
+                html: `<h2>New Catering Quote Request</h2><p>Quote Reference: ${quoteRef}</p>`
+            });
         } catch (emailError) {
-            console.error('Email sending error:', emailError);
-            // Continue anyway - request is saved
+            console.error('Resend error:', emailError);
         }
 
         res.status(201).json({
@@ -240,32 +202,17 @@ router.post('/send-quote', async (req, res) => {
         await request.save();
 
         // Send email to client
-        const mailOptions = {
-            from: process.env.SMTP_FROM,
-            to: request.email,
-            subject: `Your Catering Quote - ${quoteRef}`,
-            html: `
-                <h2>Your Catering Quote</h2>
-                <p>Dear ${request.name},</p>
-                <p>Thank you for your patience. We're pleased to provide you with a quote for your event.</p>
-                <p><strong>Event Details:</strong></p>
-                <ul>
-                    <li>Date: ${new Date(request.eventDate).toLocaleDateString()}</li>
-                    <li>Type: ${request.eventType}</li>
-                    <li>Guests: ${request.guestCount}</li>
-                    <li>Venue: ${request.venue}</li>
-                </ul>
-                <p><strong>Quoted Amount:</strong> $${quotedAmount}</p>
-                <p>This quote is valid for 14 days. Please contact us if you have any questions or would like to proceed with booking.</p>
-                <p>Best regards,<br/>Afroflavours Team</p>
-            `
-        };
-
         try {
-            await transporter.sendMail(mailOptions);
+            await resend.emails.send({
+                from: process.env.SMTP_FROM || 'onboarding@resend.dev',
+                to: request.email,
+                subject: `Your Catering Quote - ${quoteRef}`,
+                html: `<h2>Your Catering Quote</h2><p>Quoted Amount: $${quotedAmount}</p>`
+            });
         } catch (emailError) {
-            console.error('Email error:', emailError);
+            console.error('Resend error:', emailError);
         }
+
 
         res.json({
             success: true,
