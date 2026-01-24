@@ -39,6 +39,7 @@ app.use('/api/newsletter', require('./routes/newsletter'));
 app.use('/api/reviews', require('./routes/reviews'));
 app.use('/api/payments', require('./routes/payments'));
 app.use('/api/messages', require('./routes/messages'));
+app.use('/api/site-details', require('./routes/siteDetails'));
 app.use("/api/admin/dashboard", require("./routes/adminDashboard"));
 
 
