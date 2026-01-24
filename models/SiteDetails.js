@@ -5,7 +5,7 @@ const SiteDetailsSchema = new mongoose.Schema(
         about: {
             text: {
                 type: String,
-                required: true,
+                default: '',
             },
             image: {
                 type: String, // Cloudinary URL
@@ -13,19 +13,19 @@ const SiteDetailsSchema = new mongoose.Schema(
         },
         missionStatement: {
             type: String,
-            required: true,
+            default: '',
         },
         phoneNumber: {
             type: String,
-            required: true,
+            default: '',
         },
         location: {
             type: String,
-            required: true,
+            default: '',
         },
         email: {
             type: String,
-            required: true,
+            default: '',
             lowercase: true,
         },
         openingHours: {
