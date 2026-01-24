@@ -8,12 +8,12 @@ const uploadMiddleware = require('../middleware/upload');
 router.get('/', getSiteDetails);
 
 // Update site details (admin only)
-router.put('/', requireAdmin, updateSiteDetails);
+router.put('/', updateSiteDetails);
 
 // Update about section with image upload (admin only)
-router.put('/about', requireAdmin, uploadMiddleware.siteDetails.single('image'), updateAbout);
+router.put('/about', uploadMiddleware.siteDetails.single('image'), updateAbout);
 
 // Delete about image (admin only)
-router.delete('/about/image', requireAdmin, deleteAboutImage);
+router.delete('/about/image', deleteAboutImage);
 
 module.exports = router;
