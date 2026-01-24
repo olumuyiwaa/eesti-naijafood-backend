@@ -16,16 +16,36 @@ exports.getSiteDetails = async (req, res) => {
         });
     }
 };
-
 // Create or update site details
 exports.updateSiteDetails = async (req, res) => {
     try {
+        console.log('Raw req.body:', req.body);
         let { about, missionStatement, phoneNumber, location, email, openingHours, socialMedia } = req.body;
         
         // Parse JSON strings if they come as strings from FormData
-        if (typeof about === 'string') about = JSON.parse(about);
-        if (typeof openingHours === 'string') openingHours = JSON.parse(openingHours);
-        if (typeof socialMedia === 'string') socialMedia = JSON.parse(socialMedia);
+        if (typeof about === 'string') {
+            try {
+                about = JSON.parse(about);
+            } catch (e) {
+                about = { text: about };
+            }
+        }
+        if (typeof openingHours === 'string') {
+            try {
+                openingHours = JSON.parse(openingHours);
+            } catch (e) {
+                console.log('Failed to parse openingHours:', e.message);
+            }
+        }
+        if (typeof socialMedia === 'string') {
+            try {
+                socialMedia = JSON.parse(socialMedia);
+            } catch (e) {
+                console.log('Failed to parse socialMedia:', e.message);
+            }
+        }
+        
+        console.log('Parsed data:', { about, missionStatement, phoneNumber, location, email, openingHours, socialMedia });
         
         let siteDetails = await SiteDetails.findOne();
         
@@ -33,21 +53,35 @@ exports.updateSiteDetails = async (req, res) => {
             siteDetails = new SiteDetails();
         }
 
-        // Update fields if provided
-        if (about && about.text) {
-            siteDetails.about.text = about.text;
+        // Update fields if provided and not empty
+        if (about && about.text && typeof about.text === 'string' && about.text.trim()) {
+            siteDetails.about.text = about.text.trim();
         }
         if (req.file) {
             siteDetails.about.image = req.file.path; // Cloudinary URL
         }
-        if (missionStatement) siteDetails.missionStatement = missionStatement;
-        if (phoneNumber) siteDetails.phoneNumber = phoneNumber;
-        if (location) siteDetails.location = location;
-        if (email) siteDetails.email = email;
-        if (openingHours) siteDetails.openingHours = openingHours;
-        if (socialMedia) siteDetails.socialMedia = socialMedia;
+        if (missionStatement && typeof missionStatement === 'string' && missionStatement.trim()) {
+            siteDetails.missionStatement = missionStatement.trim();
+        }
+        if (phoneNumber && typeof phoneNumber === 'string' && phoneNumber.trim()) {
+            siteDetails.phoneNumber = phoneNumber.trim();
+        }
+        if (location && typeof location === 'string' && location.trim()) {
+            siteDetails.location = location.trim();
+        }
+        if (email && typeof email === 'string' && email.trim()) {
+            siteDetails.email = email.trim();
+        }
+        if (openingHours && typeof openingHours === 'object') {
+            siteDetails.openingHours = openingHours;
+        }
+        if (socialMedia && typeof socialMedia === 'object') {
+            siteDetails.socialMedia = socialMedia;
+        }
 
+        console.log('Before save:', siteDetails);
         await siteDetails.save();
+        console.log('After save:', siteDetails);
 
         res.status(200).json({
             success: true,

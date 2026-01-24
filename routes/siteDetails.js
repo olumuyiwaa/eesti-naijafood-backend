@@ -14,6 +14,6 @@ router.put('/', updateSiteDetails);
 router.put('/about', uploadMiddleware.siteDetails.single('image'), updateAbout);
 
 // Delete about image (admin only)
-router.delete('/about/image', deleteAboutImage);
+router.delete('/about/image',  deleteAboutImage);
 
 module.exports = router;
