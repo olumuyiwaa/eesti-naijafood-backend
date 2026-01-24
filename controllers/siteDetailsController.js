@@ -20,68 +20,54 @@ exports.getSiteDetails = async (req, res) => {
 exports.updateSiteDetails = async (req, res) => {
     try {
         console.log('Raw req.body:', req.body);
+        console.log('File:', req.file);
+
         let { about, missionStatement, phoneNumber, location, email, openingHours, socialMedia } = req.body;
-        
-        // Parse JSON strings if they come as strings from FormData
-        if (typeof about === 'string') {
+
+        // Safe JSON parsing
+        const safeParse = (value, fallback = {}) => {
+            if (!value) return fallback;
+            if (typeof value === 'object') return value;
             try {
-                about = JSON.parse(about);
-            } catch (e) {
-                about = { text: about };
+                return JSON.parse(value);
+            } catch {
+                return fallback;
             }
-        }
-        if (typeof openingHours === 'string') {
-            try {
-                openingHours = JSON.parse(openingHours);
-            } catch (e) {
-                console.log('Failed to parse openingHours:', e.message);
-            }
-        }
-        if (typeof socialMedia === 'string') {
-            try {
-                socialMedia = JSON.parse(socialMedia);
-            } catch (e) {
-                console.log('Failed to parse socialMedia:', e.message);
-            }
-        }
-        
-        console.log('Parsed data:', { about, missionStatement, phoneNumber, location, email, openingHours, socialMedia });
-        
+        };
+
+        about = safeParse(about, { text: '' });
+        openingHours = safeParse(openingHours, {});
+        socialMedia = safeParse(socialMedia, {});
+
+        console.log('Parsed:', {
+            about,
+            missionStatement,
+            phoneNumber,
+            location,
+            email,
+            openingHours,
+            socialMedia,
+        });
+
         let siteDetails = await SiteDetails.findOne();
-        
-        if (!siteDetails) {
-            siteDetails = new SiteDetails();
+        if (!siteDetails) siteDetails = new SiteDetails();
+
+        // Always update (not conditionally blocked)
+        siteDetails.about.text = about?.text ?? '';
+        if (req.file?.path) {
+            siteDetails.about.image = req.file.path;
         }
 
-        // Update fields if provided and not empty
-        if (about && about.text && typeof about.text === 'string' && about.text.trim()) {
-            siteDetails.about.text = about.text.trim();
-        }
-        if (req.file) {
-            siteDetails.about.image = req.file.path; // Cloudinary URL
-        }
-        if (missionStatement && typeof missionStatement === 'string' && missionStatement.trim()) {
-            siteDetails.missionStatement = missionStatement.trim();
-        }
-        if (phoneNumber && typeof phoneNumber === 'string' && phoneNumber.trim()) {
-            siteDetails.phoneNumber = phoneNumber.trim();
-        }
-        if (location && typeof location === 'string' && location.trim()) {
-            siteDetails.location = location.trim();
-        }
-        if (email && typeof email === 'string' && email.trim()) {
-            siteDetails.email = email.trim();
-        }
-        if (openingHours && typeof openingHours === 'object') {
-            siteDetails.openingHours = openingHours;
-        }
-        if (socialMedia && typeof socialMedia === 'object') {
-            siteDetails.socialMedia = socialMedia;
-        }
+        siteDetails.missionStatement = missionStatement ?? '';
+        siteDetails.phoneNumber = phoneNumber ?? '';
+        siteDetails.location = location ?? '';
+        siteDetails.email = email ?? '';
+        siteDetails.openingHours = openingHours ?? {};
+        siteDetails.socialMedia = socialMedia ?? {};
 
-        console.log('Before save:', siteDetails);
         await siteDetails.save();
-        console.log('After save:', siteDetails);
+
+        console.log('Saved:', siteDetails);
 
         res.status(200).json({
             success: true,
@@ -89,7 +75,7 @@ exports.updateSiteDetails = async (req, res) => {
             data: siteDetails,
         });
     } catch (error) {
-        console.error('Update site details error:', error);
+        console.error('Update error:', error);
         res.status(500).json({
             success: false,
             message: 'Error updating site details',
