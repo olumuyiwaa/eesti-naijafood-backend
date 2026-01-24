@@ -20,7 +20,12 @@ exports.getSiteDetails = async (req, res) => {
 // Create or update site details
 exports.updateSiteDetails = async (req, res) => {
     try {
-        const { about, missionStatement, phoneNumber, location, email, openingHours, socialMedia } = req.body;
+        let { about, missionStatement, phoneNumber, location, email, openingHours, socialMedia } = req.body;
+        
+        // Parse JSON strings if they come as strings from FormData
+        if (typeof about === 'string') about = JSON.parse(about);
+        if (typeof openingHours === 'string') openingHours = JSON.parse(openingHours);
+        if (typeof socialMedia === 'string') socialMedia = JSON.parse(socialMedia);
         
         let siteDetails = await SiteDetails.findOne();
         
@@ -50,6 +55,7 @@ exports.updateSiteDetails = async (req, res) => {
             data: siteDetails,
         });
     } catch (error) {
+        console.error('Update site details error:', error);
         res.status(500).json({
             success: false,
             message: 'Error updating site details',
