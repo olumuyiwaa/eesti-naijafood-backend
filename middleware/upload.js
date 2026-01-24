@@ -20,11 +20,12 @@ const siteDetailsStorage = new CloudinaryStorage({
     },
 });
 
-module.exports = {
-    default: multer({ storage: menuStorage }),
-    menu: multer({ storage: menuStorage }),
-    siteDetails: multer({ storage: siteDetailsStorage }),
-};
+const uploadMenu = multer({ storage: menuStorage });
+const uploadSiteDetails = multer({ storage: siteDetailsStorage });
 
-// For backward compatibility with existing code
-module.exports.default = multer({ storage: menuStorage });
+// Default export for backward compatibility
+module.exports = uploadMenu;
+
+// Named exports
+module.exports.menu = uploadMenu;
+module.exports.siteDetails = uploadSiteDetails;
