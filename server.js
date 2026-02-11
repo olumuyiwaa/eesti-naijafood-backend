@@ -4,10 +4,19 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
+const bcrypt = require('bcryptjs');
+const Admin = require('./models/Admin');
+
 require('dotenv').config();
 
+const connectDB = require('./config/database');
 
 const app = express();
+
+
+// ⭐ REQUIRED for Render / proxies
+app.set('trust proxy', 1);
+
 
 // Middleware
 app.use(helmet());
@@ -16,16 +25,44 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan('dev'));
 
-// Connect to database
-const connectDB = require('./config/database');
-connectDB();
 
-// Rate limiting
+// ⭐ Rate limiting
 const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100 // limit each IP to 100 requests per windowMs
+    windowMs: 15 * 60 * 1000,
+    max: 100
 });
 app.use('/api/', limiter);
+
+
+
+// ⭐ Auto-seed admin (runs once only)
+async function ensureAdmin() {
+    const username = process.env.ADMIN_EMAIL;
+    const password = process.env.ADMIN_PASSWORD;
+
+    if (!username || !password) {
+        console.log('⚠️ ADMIN_EMAIL or ADMIN_PASSWORD missing. Skipping seed.');
+        return;
+    }
+
+    const count = await Admin.countDocuments();
+
+    if (count > 0) {
+        console.log('✅ Admin already exists');
+        return;
+    }
+
+    const passwordHash = await bcrypt.hash(password, 12);
+
+    await Admin.create({
+        username,
+        passwordHash,
+    });
+
+    console.log('✅ Default admin created');
+}
+
+
 
 // Routes
 app.use("/api/admin", require("./routes/adminAuth"));
@@ -48,24 +85,40 @@ app.get('/health', (req, res) => {
     res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-// Error handling middleware
+
+// Error handler
 app.use((err, req, res, next) => {
     console.error(err.stack);
     res.status(err.status || 500).json({
         success: false,
-        message: err.message || 'Internal Server Error',
-        ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+        message: err.message || 'Internal Server Error'
     });
 });
 
-// 404 handler
+
+// 404
 app.use((req, res) => {
     res.status(404).json({ success: false, message: 'Route not found' });
 });
 
+
+
 const PORT = process.env.PORT || 5001;
 
-app.listen(PORT, () => {
-    console.log(`🚀 Afroflavours API running on port ${PORT}`);
-    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-});
+
+// ⭐ Start app only after DB + seed ready
+(async () => {
+    try {
+        await connectDB();
+        await ensureAdmin();
+
+        app.listen(PORT, () => {
+            console.log(`🚀 Afroflavours API running on port ${PORT}`);
+            console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+        });
+
+    } catch (err) {
+        console.error('❌ Startup failed:', err);
+        process.exit(1);
+    }
+})();
