@@ -6,6 +6,8 @@ const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const bcrypt = require('bcryptjs');
 const Admin = require('./models/Admin');
+const orderRoutes = require('./routes/orderRoutes');
+const webhookRoutes = require('./routes/webhookRoutes');
 
 require('dotenv').config();
 
@@ -21,6 +23,8 @@ app.set('trust proxy', 1);
 // Middleware
 app.use(helmet());
 app.use(cors());
+// Stripe webhook must use raw body
+app.use('/api/webhook', express.raw({ type: 'application/json' }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan('dev'));
@@ -78,6 +82,8 @@ app.use('/api/payments', require('./routes/payments'));
 app.use('/api/messages', require('./routes/messages'));
 app.use('/api/site-details', require('./routes/siteDetails'));
 app.use("/api/admin/dashboard", require("./routes/adminDashboard"));
+app.use('/api/orders', orderRoutes);
+app.use('/api/webhook', webhookRoutes);
 
 
 // Health check
