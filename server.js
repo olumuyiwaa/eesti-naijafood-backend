@@ -7,7 +7,7 @@ const rateLimit = require('express-rate-limit');
 const bcrypt = require('bcryptjs');
 const Admin = require('./models/Admin');
 const orderRoutes = require('./routes/orderRoutes');
-const webhookRoutes = require('./routes/webhookRoutes');
+// const webhookRoutes = require('./routes/webhookRoutes');
 
 require('dotenv').config();
 
@@ -83,7 +83,7 @@ app.use('/api/messages', require('./routes/messages'));
 app.use('/api/site-details', require('./routes/siteDetails'));
 app.use("/api/admin/dashboard", require("./routes/adminDashboard"));
 app.use('/api/orders', orderRoutes);
-// app.use('/api/webhook', webhookRoutes);
+app.use('/webhook', require('./routes/webhook'));
 
 
 // Health check
