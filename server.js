@@ -83,7 +83,7 @@ app.use('/api/messages', require('./routes/messages'));
 app.use('/api/site-details', require('./routes/siteDetails'));
 app.use("/api/admin/dashboard", require("./routes/adminDashboard"));
 app.use('/api/orders', orderRoutes);
-app.use('/api/webhook', webhookRoutes);
+// app.use('/api/webhook', webhookRoutes);
 
 
 // Health check

@@ -81,44 +81,44 @@ router.post('/create-catering-payment', async (req, res) => {
 });
 
 // Stripe webhook handler
-router.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
-    const sig = req.headers['stripe-signature'];
-    let event;
-
-    try {
-        event = stripe.webhooks.constructEvent(
-            req.body,
-            sig,
-            process.env.STRIPE_WEBHOOK_SECRET
-        );
-    } catch (err) {
-        console.error('Webhook signature verification failed:', err.message);
-        return res.status(400).send(`Webhook Error: ${err.message}`);
-    }
-
-    // Handle the event
-    switch (event.type) {
-        case 'payment_intent.succeeded':
-            const paymentIntent = event.data.object;
-            await handleSuccessfulPayment(paymentIntent);
-            break;
-
-        case 'payment_intent.payment_failed':
-            const failedPayment = event.data.object;
-            await handleFailedPayment(failedPayment);
-            break;
-
-        case 'charge.refunded':
-            const refund = event.data.object;
-            await handleRefund(refund);
-            break;
-
-        default:
-            console.log(`Unhandled event type ${event.type}`);
-    }
-
-    res.json({ received: true });
-});
+// router.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+//     const sig = req.headers['stripe-signature'];
+//     let event;
+//
+//     try {
+//         event = stripe.webhooks.constructEvent(
+//             req.body,
+//             sig,
+//             process.env.STRIPE_WEBHOOK_SECRET
+//         );
+//     } catch (err) {
+//         console.error('Webhook signature verification failed:', err.message);
+//         return res.status(400).send(`Webhook Error: ${err.message}`);
+//     }
+//
+//     // Handle the event
+//     switch (event.type) {
+//         case 'payment_intent.succeeded':
+//             const paymentIntent = event.data.object;
+//             await handleSuccessfulPayment(paymentIntent);
+//             break;
+//
+//         case 'payment_intent.payment_failed':
+//             const failedPayment = event.data.object;
+//             await handleFailedPayment(failedPayment);
+//             break;
+//
+//         case 'charge.refunded':
+//             const refund = event.data.object;
+//             await handleRefund(refund);
+//             break;
+//
+//         default:
+//             console.log(`Unhandled event type ${event.type}`);
+//     }
+//
+//     res.json({ received: true });
+// });
 
 // Handle successful payment
 async function handleSuccessfulPayment(paymentIntent) {
@@ -130,14 +130,14 @@ async function handleSuccessfulPayment(paymentIntent) {
         await resend.emails.send({
             from: process.env.SMTP_FROM || 'onboarding@resend.dev',
             to: customerEmail,
-            subject: 'Payment Confirmed - Afroflavours Booking',
+            subject: 'Payment Confirmed - Esti-Naija Booking',
             html: `<h2>Payment Confirmed!</h2><p>Dear ${customerName}, your booking is confirmed.</p>`
         });
     } else if (type === 'catering_deposit') {
         await resend.emails.send({
             from: process.env.SMTP_FROM || 'onboarding@resend.dev',
             to: customerEmail,
-            subject: 'Catering Deposit Confirmed - Afroflavours',
+            subject: 'Catering Deposit Confirmed - Esti-Naija',
             html: `<h2>Deposit Received!</h2><p>Dear ${customerName}, your catering deposit is processed.</p>`
         });
     }
@@ -150,7 +150,7 @@ async function handleFailedPayment(paymentIntent) {
     await resend.emails.send({
         from: process.env.SMTP_FROM || 'onboarding@resend.dev',
         to: customerEmail,
-        subject: 'Payment Failed - Afroflavours',
+        subject: 'Payment Failed - Esti-Naija',
         html: `<h2>Payment Failed</h2><p>Dear ${customerName}, unfortunately payment failed.</p>`
     });
 }
