@@ -36,8 +36,8 @@ exports.createCheckoutSession = async (req, res) => {
                 quantity: item.quantity
             })),
             mode: 'payment',
-            success_url: `${process.env.CLIENT_URL}/success?orderId=${order._id}`,
-            cancel_url: `${process.env.CLIENT_URL}/cart`,
+            success_url: `${process.env.BASE_URL}/success?orderId=${order._id}`,
+            cancel_url: `${process.env.BASE_URL}/cart`,
             metadata: {
                 orderId: order._id.toString()
             }
