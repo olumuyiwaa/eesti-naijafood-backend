@@ -5,7 +5,7 @@ const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
 
 exports.createCheckoutSession = async (req, res) => {
     try {
-        const { items, customerEmail } = req.body;
+        const { items, customerEmail,customerName,customerPhone } = req.body;
 
         if (!items || items.length === 0) {
             return res.status(400).json({ message: 'Cart is empty' });
@@ -14,7 +14,8 @@ exports.createCheckoutSession = async (req, res) => {
         // Create order in DB first (status: pending)
         const order = await Order.create({
             customerEmail,
-            customerName: "Guest User",
+            customerName,
+            customerPhone,
             items,
             totalAmount: items.reduce((acc, item) => acc + item.price * item.quantity, 0),
             status: 'pending'
