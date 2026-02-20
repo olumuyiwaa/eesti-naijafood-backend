@@ -6,6 +6,7 @@ const Booking = require("../models/Booking");
 const CateringRequest = require("../models/CateringRequest");
 const Message = require("../models/Message");
 const Review = require("../models/Review");
+const Order = require("../models/Order");
 
 // GET /api/admin/dashboard
 router.get("/", async (req, res) => {
@@ -17,9 +18,15 @@ router.get("/", async (req, res) => {
         const todayBookings = await Booking.countDocuments({
             date: { $gte: today }
         });
+        // Orders
+        const todayOrders = await Order.countDocuments({
+            date: { $gte: today }
+        });
 
         const totalBookings = await Booking.countDocuments();
+        const totalOrders = await Order.countDocuments();
         const pendingBookings = await Booking.countDocuments({ status: "pending" });
+        const pendingOrders = await Order.countDocuments({ status: "pending" });
 
         // Catering Requests
         const cateringRequests = await CateringRequest.countDocuments();
@@ -39,6 +46,7 @@ router.get("/", async (req, res) => {
 
         // Recent data
         const recentBookings = await Booking.find().sort({ createdAt: -1 }).limit(5);
+        const recentOrders = await Order.find().sort({ createdAt: -1 }).limit(5);
         const recentCatering = await CateringRequest.find().sort({ createdAt: -1 }).limit(5);
 
         console.log({
@@ -49,6 +57,11 @@ router.get("/", async (req, res) => {
                     total: totalBookings,
                     pending: pendingBookings
                 },
+                orders: {
+                    today: todayOrders,
+                    total: totalOrders,
+                    pending: pendingOrders
+                },
                 catering: {
                     requests: cateringRequests,
                     pending: pendingCatering
@@ -62,6 +75,7 @@ router.get("/", async (req, res) => {
                 }
             },
             recentBookings,
+            recentOrders,
             recentCatering
         });
         res.json({
@@ -72,6 +86,11 @@ router.get("/", async (req, res) => {
                     total: totalBookings,
                     pending: pendingBookings
                 },
+                orders: {
+                    today: todayOrders,
+                    total: totalOrders,
+                    pending: pendingOrders
+                },
                 catering: {
                     requests: cateringRequests,
                     pending: pendingCatering
@@ -85,6 +104,7 @@ router.get("/", async (req, res) => {
                 }
             },
             recentBookings,
+            recentOrders,
             recentCatering
         });
     } catch (err) {
